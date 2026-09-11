@@ -11,49 +11,105 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Baixar arquivos do repositório
+      - name: Baixar arquivos do repositorio
         uses: actions/checkout@v4
 
-      - name: Localizar e extrair projeto
+      - name: Verificar ZIP corrigido
         shell: bash
         run: |
           set -e
 
-          ZIP="$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)"
+          ZIP="./PedrinhaTracker_APK_CORRIGIDO.zip"
 
-          if [ -z "$ZIP" ]; then
-            echo "ERRO: nenhum arquivo ZIP encontrado."
+          echo "=========================================="
+          echo "VERIFICACAO DO PROJETO PEDRINHATRACKER"
+          echo "=========================================="
+
+          if [ ! -f "$ZIP" ]; then
+            echo "ERRO: arquivo nao encontrado:"
+            echo "$ZIP"
+            echo ""
+            echo "Arquivos ZIP encontrados na raiz:"
+            find . -maxdepth 1 -type f -iname "*.zip" -print
             exit 1
           fi
 
-          echo "ZIP encontrado: $ZIP"
+          echo "ZIP CORRETO ENCONTRADO:"
+          echo "$ZIP"
 
           mkdir -p project
           unzip -o "$ZIP" -d project
 
-          echo "Conteúdo extraído:"
-          find project -maxdepth 3 -type f | head -100
-
-      - name: Encontrar projeto Android
+      - name: Validar estrutura do projeto corrigido
         shell: bash
         run: |
           set -e
 
-          PROJECT_DIR="$(find project -type f -name 'settings.gradle' -o -name 'settings.gradle.kts' | head -n 1 | xargs -r dirname)"
+          PROJECT_DIR="project/PedrinhaTracker_FINAL_CORRIGIDO"
 
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERRO: projeto Android não encontrado."
+          echo "=========================================="
+          echo "VALIDANDO PROJETO"
+          echo "=========================================="
+          echo "Pasta esperada:"
+          echo "$PROJECT_DIR"
+
+          if [ ! -d "$PROJECT_DIR" ]; then
+            echo "ERRO: pasta do projeto corrigido nao encontrada."
+            echo ""
+            echo "Estrutura extraida:"
+            find project -maxdepth 4 -type f -print
             exit 1
           fi
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Projeto encontrado em: $PROJECT_DIR"
+          if [ ! -f "$PROJECT_DIR/settings.gradle" ]; then
+            echo "ERRO: settings.gradle nao encontrado."
+            exit 1
+          fi
 
-      - name: Configurar Java
+          if [ ! -f "$PROJECT_DIR/build.gradle" ]; then
+            echo "ERRO: build.gradle nao encontrado."
+            exit 1
+          fi
+
+          if [ ! -f "$PROJECT_DIR/app/build.gradle" ]; then
+            echo "ERRO: app/build.gradle nao encontrado."
+            exit 1
+          fi
+
+          if [ ! -f "$PROJECT_DIR/app/src/main/java/com/pedrinhatracker/app/MainActivity.java" ]; then
+            echo "ERRO: MainActivity.java nao encontrado."
+            exit 1
+          fi
+
+          echo ""
+          echo "ARQUIVOS PRINCIPAIS ENCONTRADOS:"
+          find "$PROJECT_DIR" -maxdepth 6 -type f -print
+
+          echo ""
+          echo "VERIFICANDO WebViewAssetLoader:"
+          grep -n "WebViewAssetLoader" \
+            "$PROJECT_DIR/app/src/main/java/com/pedrinhatracker/app/MainActivity.java"
+
+          echo ""
+          echo "VERIFICANDO WebViewClientCompat:"
+          grep -n "WebViewClientCompat" \
+            "$PROJECT_DIR/app/src/main/java/com/pedrinhatracker/app/MainActivity.java"
+
+          echo ""
+          echo "VERIFICANDO dependencia AndroidX WebKit:"
+          grep -n "androidx.webkit:webkit" \
+            "$PROJECT_DIR/app/build.gradle"
+
+          echo ""
+          echo "VALIDACAO DA ESTRUTURA CONCLUIDA."
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Configurar Android SDK
         uses: android-actions/setup-android@v3
@@ -61,21 +117,58 @@ jobs:
       - name: Instalar Android SDK 36
         shell: bash
         run: |
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          set -e
 
-      - name: Configurar Gradle
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
+      - name: Configurar Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.13'
+          gradle-version: "8.13"
 
-      - name: Compilar APK
+      - name: Compilar APK Debug
         working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
         run: |
+          set -e
+
+          echo "=========================================="
+          echo "INICIANDO COMPILACAO DO APK"
+          echo "=========================================="
+
           gradle :app:assembleDebug --no-daemon
 
-      - name: Enviar APK
+      - name: Verificar APK gerado
+        shell: bash
+        run: |
+          set -e
+
+          APK="${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk"
+
+          echo "=========================================="
+          echo "VERIFICANDO APK"
+          echo "=========================================="
+
+          if [ ! -f "$APK" ]; then
+            echo "ERRO: o APK nao foi encontrado."
+            echo ""
+            echo "Arquivos gerados:"
+            find "${{ env.PROJECT_DIR }}/app/build" -type f -print 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "APK GERADO COM SUCESSO:"
+          echo "$APK"
+
+          ls -lh "$APK"
+
+      - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
           name: PedrinhaTracker-debug-apk
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
