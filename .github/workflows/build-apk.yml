@@ -3,35 +3,53 @@ name: Construir APK PedrinhaTracker
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Baixar projeto
+      - name: Baixar arquivos do repositório
         uses: actions/checkout@v4
 
-      - name: Preparar projeto Android
+      - name: Localizar e extrair projeto
         shell: bash
         run: |
           set -e
-          ZIP="$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)"
-          if [ -z "$ZIP" ]; then
-            echo "ERRO: ZIP do projeto não encontrado na raiz do repositório."
-            exit 1
-          fi
-          mkdir -p project
-          unzip -q "$ZIP" -d project
-          ROOT="$(find project -maxdepth 2 -type f -name settings.gradle | head -n 1 | xargs -r dirname)"
-          if [ -z "$ROOT" ]; then
-            echo "ERRO: projeto Android não encontrado dentro do ZIP."
-            exit 1
-          fi
-          echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
 
-      - name: Configurar Java 17
+          ZIP="$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)"
+
+          if [ -z "$ZIP" ]; then
+            echo "ERRO: nenhum arquivo ZIP encontrado."
+            exit 1
+          fi
+
+          echo "ZIP encontrado: $ZIP"
+
+          mkdir -p project
+          unzip -o "$ZIP" -d project
+
+          echo "Conteúdo extraído:"
+          find project -maxdepth 3 -type f | head -100
+
+      - name: Encontrar projeto Android
+        shell: bash
+        run: |
+          set -e
+
+          PROJECT_DIR="$(find project -type f -name 'settings.gradle' -o -name 'settings.gradle.kts' | head -n 1 | xargs -r dirname)"
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERRO: projeto Android não encontrado."
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Projeto encontrado em: $PROJECT_DIR"
+
+      - name: Configurar Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -40,7 +58,8 @@ jobs:
       - name: Configurar Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Instalar SDK Android
+      - name: Instalar Android SDK 36
+        shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
@@ -51,12 +70,12 @@ jobs:
           gradle-version: '8.13'
 
       - name: Compilar APK
-        working-directory: ${{ env.PROJECT_ROOT }}
-        run: gradle :app:assembleDebug --no-daemon
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          gradle :app:assembleDebug --no-daemon
 
-      - name: Disponibilizar APK
+      - name: Enviar APK
         uses: actions/upload-artifact@v4
         with:
-          name: PedrinhaTracker-APK
-          path: ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/app-debug.apk
-          
+          name: PedrinhaTracker-debug-apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
