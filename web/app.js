@@ -1,35 +1,132 @@
+"use strict";
+
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-const status = document.getElementById("status");
+
+const statusEl = document.getElementById("status");
+
+const startButton = document.getElementById("start");
+const calibrarButton = document.getElementById("calibrar");
+const pedrinhaButton = document.getElementById("pedrinha");
+const limparButton = document.getElementById("limpar");
 
 let stream = null;
-let modo = "parado";
-let copos = [];
-let alvo = null;
-let ativo = false;
 
-function mensagem(texto) {
-  status.textContent = texto;
+let cameraAtiva = false;
+
+let modo = "parado";
+
+let copos = [];
+
+let alvo = null;
+
+let desenhoIniciado = false;
+
+
+/*
+========================================================
+STATUS
+========================================================
+*/
+
+function status(texto) {
+  statusEl.textContent = texto;
 }
+
+
+/*
+========================================================
+CONFIGURAÇÃO DO VIDEO PARA IPHONE / SAFARI
+========================================================
+*/
+
+function prepararVideo() {
+
+  video.muted = true;
+
+  video.autoplay = true;
+
+  video.playsInline = true;
+
+  video.setAttribute("playsinline", "");
+
+  video.setAttribute("webkit-playsinline", "");
+
+  video.setAttribute("autoplay", "");
+
+  video.setAttribute("muted", "");
+
+  video.setAttribute("disablepictureinpicture", "");
+
+  video.setAttribute("disableremoteplayback", "");
+
+}
+
+
+/*
+========================================================
+TAMANHO DO CANVAS
+========================================================
+*/
 
 function ajustarCanvas() {
-  if (video.videoWidth > 0) {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+
+  if (!video.videoWidth || !video.videoHeight) {
+    return;
   }
+
+  if (
+    canvas.width !== video.videoWidth ||
+    canvas.height !== video.videoHeight
+  ) {
+
+    canvas.width = video.videoWidth;
+
+    canvas.height = video.videoHeight;
+
+  }
+
 }
 
+
+/*
+========================================================
+DESENHO
+========================================================
+*/
+
 function desenhar() {
-  if (!ativo) return;
+
+  if (!cameraAtiva) {
+    return;
+  }
 
   ajustarCanvas();
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+
+  /*
+  ------------------------------------------------------
+  COPOS
+  ------------------------------------------------------
+  */
 
   for (const copo of copos) {
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = Math.max(3, canvas.width / 220);
+
+    ctx.strokeStyle = "#ffffff";
+
+    ctx.lineWidth =
+      Math.max(
+        3,
+        canvas.width / 220
+      );
 
     ctx.strokeRect(
       copo.x - 45,
@@ -38,19 +135,37 @@ function desenhar() {
       140
     );
 
-    ctx.fillStyle = "white";
-    ctx.font = "bold 28px Arial";
+
+    ctx.fillStyle = "#ffffff";
+
+    ctx.font =
+      "bold 28px Arial";
 
     ctx.fillText(
       String(copo.id),
       copo.x - 10,
       copo.y - 82
     );
+
   }
 
+
+  /*
+  ------------------------------------------------------
+  PEDRINHA
+  ------------------------------------------------------
+  */
+
   if (alvo) {
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = Math.max(5, canvas.width / 180);
+
+    ctx.strokeStyle = "#ffffff";
+
+    ctx.lineWidth =
+      Math.max(
+        5,
+        canvas.width / 180
+      );
+
 
     ctx.beginPath();
 
@@ -64,169 +179,586 @@ function desenhar() {
 
     ctx.stroke();
 
-    ctx.fillStyle = "white";
-    ctx.font = "bold 18px Arial";
+
+    ctx.fillStyle = "#ffffff";
+
+    ctx.font =
+      "bold 18px Arial";
 
     ctx.fillText(
       "PEDRINHA",
       alvo.x - 48,
       alvo.y - 30
     );
+
   }
 
+
   requestAnimationFrame(desenhar);
+
 }
 
-async function iniciarCamera() {
+
+/*
+========================================================
+TENTAR DAR PLAY
+========================================================
+*/
+
+async function tocarVideo() {
+
+  prepararVideo();
+
   try {
-    if (!navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia) {
 
-      mensagem(
-        "Este navegador não permite acesso à câmera."
-      );
+    const resultado =
+      video.play();
 
-      return;
+    if (
+      resultado &&
+      typeof resultado.then === "function"
+    ) {
+
+      await resultado;
+
     }
 
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: {
-          ideal: "environment"
-        }
-      },
-      audio: false
-    });
+    return true;
 
-    video.srcObject = stream;
+  } catch (erro) {
 
-    await video.play();
-
-    ativo = true;
-
-    mensagem(
-      "Câmera ativa. Toque em 'Calibrar copos'."
+    console.error(
+      "Falha no video.play():",
+      erro
     );
+
+    return false;
+
+  }
+
+}
+
+
+/*
+========================================================
+ABRIR CÂMERA
+========================================================
+*/
+
+async function iniciarCamera() {
+
+  /*
+  IMPORTANTE:
+  ESTA FUNÇÃO É CHAMADA DIRETAMENTE
+  PELO TOQUE DO USUÁRIO.
+  */
+
+  status(
+    "Solicitando acesso à câmera..."
+  );
+
+
+  prepararVideo();
+
+
+  /*
+  ------------------------------------------------------
+  VERIFICAÇÃO DO NAVEGADOR
+  ------------------------------------------------------
+  */
+
+  if (
+    !navigator.mediaDevices ||
+    !navigator.mediaDevices.getUserMedia
+  ) {
+
+    status(
+      "Este Safari não disponibiliza a câmera para esta página."
+    );
+
+    return;
+
+  }
+
+
+  /*
+  ------------------------------------------------------
+  FECHAR STREAM ANTERIOR
+  ------------------------------------------------------
+  */
+
+  if (stream) {
+
+    for (
+      const track of stream.getTracks()
+    ) {
+
+      track.stop();
+
+    }
+
+  }
+
+
+  /*
+  ------------------------------------------------------
+  CONFIGURAÇÃO DA CÂMERA
+  ------------------------------------------------------
+  */
+
+  let constraints = {
+
+    audio: false,
+
+    video: {
+
+      facingMode: {
+        ideal: "environment"
+      }
+
+    }
+
+  };
+
+
+  try {
+
+    /*
+    PRIMEIRA TENTATIVA:
+    câmera traseira
+    */
+
+    stream =
+      await navigator.mediaDevices.getUserMedia(
+        constraints
+      );
+
+  } catch (erro1) {
+
+    console.error(
+      "Primeira tentativa:",
+      erro1
+    );
+
+
+    /*
+    SEGUNDA TENTATIVA:
+    câmera genérica
+    */
+
+    try {
+
+      stream =
+        await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+
+    } catch (erro2) {
+
+      console.error(
+        "Segunda tentativa:",
+        erro2
+      );
+
+
+      let mensagem =
+        "Não consegui acessar a câmera.";
+
+
+      if (
+        erro2.name === "NotAllowedError"
+      ) {
+
+        mensagem =
+          "A câmera foi bloqueada. No Safari, permita a câmera para este site.";
+
+      } else if (
+        erro2.name === "NotFoundError"
+      ) {
+
+        mensagem =
+          "Nenhuma câmera foi encontrada.";
+
+      } else if (
+        erro2.name === "NotReadableError"
+      ) {
+
+        mensagem =
+          "A câmera está sendo usada por outro aplicativo.";
+
+      } else if (
+        erro2.name === "SecurityError"
+      ) {
+
+        mensagem =
+          "O Safari bloqueou a câmera por segurança. Abra o endereço HTTPS no Safari.";
+
+      }
+
+
+      status(mensagem);
+
+      return;
+
+    }
+
+  }
+
+
+  /*
+  ------------------------------------------------------
+  COLOCAR STREAM NO VIDEO
+  ------------------------------------------------------
+  */
+
+  video.srcObject = stream;
+
+  video.muted = true;
+
+  video.autoplay = true;
+
+  video.playsInline = true;
+
+
+  /*
+  ------------------------------------------------------
+  ESPERAR METADADOS
+  ------------------------------------------------------
+  */
+
+  await new Promise(
+    (resolve) => {
+
+      if (
+        video.readyState >= 1
+      ) {
+
+        resolve();
+
+        return;
+
+      }
+
+
+      video.onloadedmetadata =
+        () => {
+
+          resolve();
+
+        };
+
+    }
+  );
+
+
+  /*
+  ------------------------------------------------------
+  TENTAR PLAY
+  ------------------------------------------------------
+  */
+
+  const tocou =
+    await tocarVideo();
+
+
+  if (!tocou) {
+
+    status(
+      "A câmera foi encontrada, mas o Safari não iniciou o vídeo. Toque novamente em ABRIR CÂMERA."
+    );
+
+    return;
+
+  }
+
+
+  /*
+  ------------------------------------------------------
+  SUCESSO
+  ------------------------------------------------------
+  */
+
+  cameraAtiva = true;
+
+  status(
+    "🔥 CÂMERA ATIVA! Agora toque em CALIBRAR COPOS."
+  );
+
+
+  /*
+  ------------------------------------------------------
+  COMEÇAR DESENHO
+  ------------------------------------------------------
+  */
+
+  if (!desenhoIniciado) {
+
+    desenhoIniciado = true;
 
     desenhar();
 
-  } catch (erro) {
-    console.error(erro);
-
-    mensagem(
-      "Não consegui acessar a câmera. Verifique a permissão do Safari."
-    );
   }
+
 }
+
+
+/*
+========================================================
+CLIQUE DO BOTÃO DA CÂMERA
+========================================================
+*/
+
+startButton.addEventListener(
+  "click",
+  iniciarCamera
+);
+
+
+/*
+========================================================
+CALIBRAR COPOS
+========================================================
+*/
+
+calibrarButton.addEventListener(
+  "click",
+  function () {
+
+    if (!cameraAtiva) {
+
+      status(
+        "Primeiro toque em ABRIR CÂMERA."
+      );
+
+      return;
+
+    }
+
+
+    copos = [];
+
+    alvo = null;
+
+    modo = "copos";
+
+
+    status(
+      "Toque no centro do COPO 1."
+    );
+
+  }
+);
+
+
+/*
+========================================================
+SELECIONAR PEDRINHA
+========================================================
+*/
+
+pedrinhaButton.addEventListener(
+  "click",
+  function () {
+
+    if (!cameraAtiva) {
+
+      status(
+        "Primeiro abra a câmera."
+      );
+
+      return;
+
+    }
+
+
+    modo = "alvo";
+
+
+    status(
+      "Toque exatamente na PEDRINHA."
+    );
+
+  }
+);
+
+
+/*
+========================================================
+LIMPAR
+========================================================
+*/
+
+limparButton.addEventListener(
+  "click",
+  function () {
+
+    copos = [];
+
+    alvo = null;
+
+    modo = "parado";
+
+
+    status(
+      "Marcações limpas."
+    );
+
+  }
+);
+
+
+/*
+========================================================
+TOQUE NO CANVAS
+========================================================
+*/
 
 canvas.addEventListener(
   "pointerdown",
-  function(event) {
+  function (event) {
 
-    if (!video.videoWidth) return;
+    if (!cameraAtiva) {
+      return;
+    }
 
-    const rect = canvas.getBoundingClientRect();
+
+    if (
+      !video.videoWidth ||
+      !video.videoHeight
+    ) {
+
+      return;
+
+    }
+
+
+    const rect =
+      canvas.getBoundingClientRect();
+
 
     const x =
-      (event.clientX - rect.left) *
+      (
+        event.clientX -
+        rect.left
+      ) *
       canvas.width /
       rect.width;
 
+
     const y =
-      (event.clientY - rect.top) *
+      (
+        event.clientY -
+        rect.top
+      ) *
       canvas.height /
       rect.height;
 
+
+    /*
+    ----------------------------------------------------
+    COPOS
+    ----------------------------------------------------
+    */
+
     if (modo === "copos") {
 
+      const numero =
+        copos.length + 1;
+
+
       copos.push({
-        id: copos.length + 1,
+
+        id: numero,
+
         x: x,
+
         y: y
+
       });
 
-      if (copos.length === 3) {
+
+      if (
+        copos.length === 3
+      ) {
 
         modo = "parado";
 
-        mensagem(
-          "Copos 1, 2 e 3 calibrados. Agora selecione a pedrinha."
+
+        status(
+          "🔥 Copos 1, 2 e 3 calibrados. Agora selecione a pedrinha."
         );
 
       } else {
 
-        mensagem(
+        status(
           "Copo " +
-          copos.length +
-          " marcado. Toque no copo " +
-          (copos.length + 1) +
+          numero +
+          " marcado. Agora toque no copo " +
+          (numero + 1) +
           "."
         );
+
       }
 
-    } else if (modo === "alvo") {
+      return;
+
+    }
+
+
+    /*
+    ----------------------------------------------------
+    PEDRINHA
+    ----------------------------------------------------
+    */
+
+    if (modo === "alvo") {
 
       alvo = {
+
         x: x,
+
         y: y
+
       };
+
 
       modo = "parado";
 
-      mensagem(
-        "Pedrinha selecionada. Marcador branco ativado."
+
+      status(
+        "🔥 PEDRINHA SELECIONADA!"
       );
+
     }
+
+  },
+  {
+    passive: true
   }
 );
 
-document
-  .getElementById("start")
-  .onclick = iniciarCamera;
 
-document
-  .getElementById("calibrar")
-  .onclick = function() {
+/*
+========================================================
+RESIZE
+========================================================
+*/
 
-    if (!ativo) {
-      mensagem("Inicie a câmera primeiro.");
-      return;
-    }
+window.addEventListener(
+  "resize",
+  ajustarCanvas
+);
 
-    copos = [];
-    alvo = null;
-    modo = "copos";
 
-    mensagem(
-      "Toque no centro do copo 1."
-    );
-  };
+/*
+========================================================
+INICIALIZAÇÃO
+========================================================
+*/
 
-document
-  .getElementById("pedrinha")
-  .onclick = function() {
+prepararVideo();
 
-    if (!ativo) {
-      mensagem("Inicie a câmera primeiro.");
-      return;
-    }
-
-    modo = "alvo";
-
-    mensagem(
-      "Toque exatamente na pedrinha."
-    );
-  };
-
-document
-  .getElementById("limpar")
-  .onclick = function() {
-
-    copos = [];
-    alvo = null;
-    modo = "parado";
-
-    mensagem(
-      "Marcações limpas."
-    );
-  };
+status(
+  "Pronto. Toque em ABRIR CÂMERA."
+);
