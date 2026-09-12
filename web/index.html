@@ -1,237 +1,40 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
-  >
-
-  <meta name="theme-color" content="#000000">
-
-  <meta
-    name="apple-mobile-web-app-capable"
-    content="yes"
-  >
-
-  <meta
-    name="apple-mobile-web-app-status-bar-style"
-    content="black-translucent"
-  >
-
-  <meta
-    name="apple-mobile-web-app-title"
-    content="PedrinhaTracker"
-  >
-
-  <title>PedrinhaTracker</title>
-
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      min-height: 100%;
-      background: #000;
-      color: #fff;
-      font-family:
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        Arial,
-        sans-serif;
-    }
-
-    body {
-      overflow-x: hidden;
-    }
-
-    main {
-      width: 100%;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 12px;
-    }
-
-    h1 {
-      margin: 4px 0 12px;
-      font-size: 24px;
-    }
-
-    .camera {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 9 / 16;
-      background: #000;
-      border-radius: 16px;
-      overflow: hidden;
-    }
-
-    #video {
-      position: absolute;
-      inset: 0;
-
-      width: 100%;
-      height: 100%;
-
-      object-fit: cover;
-
-      display: block;
-
-      background: #000;
-
-      /*
-       * IMPORTANTE PARA IPHONE / SAFARI
-       */
-      -webkit-playsinline: true;
-      -webkit-transform: translateZ(0);
-      transform: translateZ(0);
-    }
-
-    #canvas {
-      position: absolute;
-      inset: 0;
-
-      width: 100%;
-      height: 100%;
-
-      display: block;
-
-      touch-action: none;
-
-      pointer-events: auto;
-    }
-
-    .painel {
-      margin-top: 12px;
-      padding: 14px;
-
-      background: #171717;
-
-      border-radius: 16px;
-    }
-
-    #status {
-      min-height: 42px;
-
-      margin-bottom: 10px;
-
-      font-size: 15px;
-      line-height: 1.4;
-    }
-
-    button {
-      width: 100%;
-
-      min-height: 50px;
-
-      margin: 5px 0;
-
-      border: 0;
-      border-radius: 13px;
-
-      font-size: 16px;
-      font-weight: 800;
-
-      -webkit-appearance: none;
-      appearance: none;
-
-      touch-action: manipulation;
-    }
-
-    #start {
-      background: #fff;
-      color: #000;
-    }
-
-    #calibrar {
-      background: #303030;
-      color: #fff;
-    }
-
-    #pedrinha {
-      background: #303030;
-      color: #fff;
-    }
-
-    #limpar {
-      background: #9d2222;
-      color: #fff;
-    }
-
-    .info {
-      margin-top: 10px;
-
-      color: #aaa;
-
-      font-size: 13px;
-      line-height: 1.5;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PedrinhaTracker">
+<title>PedrinhaTracker</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;padding:0;width:100%;min-height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+body{overflow-x:hidden}main{width:100%;max-width:900px;margin:0 auto;padding:12px}h1{margin:4px 0 12px;font-size:24px}
+.camera{position:relative;width:100%;aspect-ratio:9/16;background:#000;border-radius:16px;overflow:hidden}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:#000;-webkit-playsinline:true}
+#canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.painel{margin-top:12px;padding:14px;background:#171717;border-radius:16px}#status{min-height:42px;margin-bottom:10px;font-size:15px;line-height:1.4}
+button{width:100%;min-height:50px;margin:5px 0;border:0;border-radius:13px;font-size:16px;font-weight:800;-webkit-appearance:none;touch-action:manipulation}
+#start{background:#fff;color:#000}#calibrar,#pedrinha{background:#303030;color:#fff}#limpar{background:#9d2222;color:#fff}
+.info{margin-top:10px;color:#aaa;font-size:13px;line-height:1.5}
+</style>
 </head>
-
 <body>
-
 <main>
-
-  <h1>🪨 PedrinhaTracker</h1>
-
-  <div class="camera">
-
-    <video
-      id="video"
-      autoplay
-      muted
-      playsinline
-      webkit-playsinline
-      disablepictureinpicture
-      disableremoteplayback
-      preload="none"
-    ></video>
-
-    <canvas id="canvas"></canvas>
-
-  </div>
-
-  <div class="painel">
-
-    <div id="status">
-      Toque em ABRIR CÂMERA.
-    </div>
-
-    <button id="start">
-      📷 ABRIR CÂMERA
-    </button>
-
-    <button id="calibrar">
-      1️⃣ CALIBRAR COPOS
-    </button>
-
-    <button id="pedrinha">
-      🪨 SELECIONAR PEDRINHA
-    </button>
-
-    <button id="limpar">
-      🗑️ LIMPAR
-    </button>
-
-    <div class="info">
-      No primeiro uso, o Safari poderá perguntar se o
-      PedrinhaTracker pode acessar a câmera. Escolha
-      Permitir.
-    </div>
-
-  </div>
-
+<h1>🪨 PedrinhaTracker</h1>
+<div class="camera">
+<video id="video" autoplay muted playsinline webkit-playsinline disablepictureinpicture disableremoteplayback preload="none"></video>
+<canvas id="canvas"></canvas>
+</div>
+<div class="painel">
+<div id="status">Toque em ABRIR CÂMERA.</div>
+<button id="start">📷 ABRIR CÂMERA</button>
+<button id="calibrar">1️⃣ CALIBRAR COPOS</button>
+<button id="pedrinha">🪨 SELECIONAR PEDRINHA</button>
+<button id="limpar">🗑️ LIMPAR</button>
+<div class="info">Após calibrar, o rastreamento acompanha os três copos e a pedrinha automaticamente. Mantenha a câmera o mais fixa possível.</div>
+</div>
 </main>
-
-<script src="app.js?v=iphone2"></script>
-
+<script src="app.js?v=tracker3"></script>
 </body>
 </html>
